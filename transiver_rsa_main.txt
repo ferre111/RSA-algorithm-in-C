@@ -1,0 +1,107 @@
+1. Definicje oraz includy:
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdbool.h>
+#include "rsa.h"
+
+#define GIVE_PUBLIC_KEY_CMD		"Give public key"
+#define PUBLIC_KEY_MESSAGE_HEADER	"Public key:"
+
+static rsa_structure rsa_ctx;
+static rsa_public_key rsa_second_board_public_key;
+static uint8_t receive_buffer[512];
+static volatile bool new_encrypted_message;
+static volatile uint32_t last_encrypted_message_length;
+static volatile bool public_key_obtained;
+
+static void decrypt_message(char *buff);
+static void encrypt_message(char *message, uint32_t *encrypted_message);
+
+2. Zmiany w mainie.
+
+rsa_init(59, 67, &rsa_ctx);
+
+HAL_UARTEx_ReceiveToIdle_DMA(&huart2, receive_buffer, sizeof(receive_buffer) / sizeof(receive_buffer[0]));
+
+
+while(!public_key_obtained) {
+	  HAL_UART_Transmit_IT(&huart2, (uint8_t*)GIVE_PUBLIC_KEY_CMD, sizeof(GIVE_PUBLIC_KEY_CMD));
+	  HAL_Delay(1000);
+  }
+  char *message_tx = "Standardy i systemy komunikacyjne";
+  uint32_t message_encrypted[strlen(message_tx) + 1];
+
+  while (1)
+  {
+    /* USER CODE END WHILE */
+
+    /* USER CODE BEGIN 3 */
+	  HAL_Delay(1000);
+	  if (public_key_obtained) {
+			encrypt_message(message_tx, message_encrypted);
+			HAL_UART_Transmit_IT(&huart2, (uint8_t*)&message_encrypted, (strlen(message_tx) + 1) * sizeof(uint32_t));
+	  }
+
+  }
+
+
+3.Funkcja Callback
+
+void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t Size)
+{
+	static char tmp_buffer[128];
+    // Check if UART2 trigger the Callback
+    if(huart->Instance == USART2)
+    {
+    	receive_buffer[Size] = '\0';
+
+    	if (new_encrypted_message) {
+    		new_encrypted_message = false;
+    		last_encrypted_message_length = 0;
+    		HAL_GPIO_WritePin(DATA_CORRUPTED_GPIO_Port, DATA_CORRUPTED_Pin, true);
+    	}
+
+    	if (!strncmp((char*)receive_buffer, GIVE_PUBLIC_KEY_CMD, sizeof(GIVE_PUBLIC_KEY_CMD) - 1)) {
+    		rsa_public_key *public_key = rsa_get_public_key(&rsa_ctx);
+    		int len = snprintf(tmp_buffer, sizeof(tmp_buffer), "%s%lu,%lu", PUBLIC_KEY_MESSAGE_HEADER, public_key->e, public_key->n);
+    		if (len) {
+    			HAL_UART_Transmit_IT(&huart2, (uint8_t*)tmp_buffer, len + 1);
+    		}
+    		HAL_UARTEx_ReceiveToIdle_DMA(&huart2, receive_buffer, sizeof(receive_buffer) / sizeof(receive_buffer[0]));
+    	} else if (!strncmp((char*)receive_buffer, PUBLIC_KEY_MESSAGE_HEADER, sizeof(PUBLIC_KEY_MESSAGE_HEADER) - 1)) {
+    		rsa_second_board_public_key.e = atoi((char*)&receive_buffer[sizeof(PUBLIC_KEY_MESSAGE_HEADER) - 1]);
+    		char *ptr = strtok((char*)receive_buffer, ",");
+    		ptr = strtok(NULL, ",");
+			rsa_second_board_public_key.n = atoi(ptr);
+			public_key_obtained = true;
+			HAL_UARTEx_ReceiveToIdle_DMA(&huart2, receive_buffer, sizeof(receive_buffer) / sizeof(receive_buffer[0]));
+    	} else {
+    		new_encrypted_message = true;
+    		last_encrypted_message_length = Size;
+    	}
+    }
+}
+
+4.Funkcje decrypt oraz encrypt:
+
+static void decrypt_message(char *buff) {
+	for (uint32_t i = 0; i < last_encrypted_message_length; i += 4) {
+		buff[i / 4] = (char)rsa_decrypt(*(uint32_t*)&receive_buffer[i], &rsa_ctx);
+	}
+}
+
+static void encrypt_message(char *message, uint32_t *encrypted_message) {
+	uint32_t i = 0;
+	for (; i < strlen(message); i++) {
+		encrypted_message[i] = rsa_encrypt((uint32_t)message[i], &rsa_second_board_public_key);
+	}
+	encrypted_message[i] = rsa_encrypt((uint32_t)'\0', &rsa_second_board_public_key);
+}
+
+
+
+
+
+
