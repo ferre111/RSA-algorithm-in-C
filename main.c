@@ -23,6 +23,7 @@ int main(void) {
 		decrypted_message[i] = rsa_decrypt(encrypted_message[i], &ctx);
 	}
 
+
 	printf("Original message: %s\n", message);
 	printf("Decrypted message: %s\n", decrypted_message);
 }
