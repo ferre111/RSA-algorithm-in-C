@@ -64,8 +64,8 @@ void rsa_init(uint32_t p, uint32_t q, rsa_structure* rsa_ctx) {
 		}
 	}
 	
-	printf("RSA parameters:\np_prime: %d\nq_prime: %d\nn: %d\ntotient: %d\ne: %d\nd: %d\n", rsa_ctx->p_prime, rsa_ctx->q_prime,
-		rsa_ctx->public_key.n, rsa_ctx->totient, rsa_ctx->public_key.e, rsa_ctx->d);
+	// printf("RSA parameters:\np_prime: %d\nq_prime: %d\nn: %d\ntotient: %d\ne: %d\nd: %d\n", rsa_ctx->p_prime, rsa_ctx->q_prime,
+	// 	rsa_ctx->public_key.n, rsa_ctx->totient, rsa_ctx->public_key.e, rsa_ctx->d);
 }
 
 uint32_t rsa_encrypt(uint32_t msg, rsa_public_key* public_key) {

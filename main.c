@@ -16,6 +16,7 @@ int main(void) {
 
 	for (uint32_t i = 0; i < sizeof(message); i++) {
 		encrypted_message[i] = rsa_encrypt(message[i], rsa_get_public_key(&ctx));
+		printf("Char %c encrypted to %d\n", message[i], encrypted_message[i]);
 	}
 
 	for (uint32_t i = 0; i < sizeof(message); i++) {
